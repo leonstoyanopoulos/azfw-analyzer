@@ -1,21 +1,22 @@
 # azfw-analyzer
 
-Eine kleine CLI-Applikation zur Analyse von **Azure Firewall Rules** (JSON-Export).
+A small CLI application for analyzing **Azure Firewall Rules** from a JSON export.
 
 ## Features
 
-- Extrahiert Rules aus `collectionGroups` / `ruleCollectionGroups`
-- Erkennt doppelte Rule-Namen
-- Erkennt inhaltlich doppelte Rule-Definitionen
-- Meldet potenziell "shadowed" Rules (frühere, allgemeinere Rule kann spätere überdecken)
+- Extracts rules from `collectionGroups` / `ruleCollectionGroups`
+- Detects duplicate rule names
+- Detects duplicate rule definitions (same signature)
+- Reports potentially shadowed rules (an earlier, broader rule may shadow a later one)
+- Can export an HTML table with rules sorted by priority (no CSS)
 
-## Voraussetzungen
+## Requirements
 
 - Python 3.10+
 
-## Woher bekomme ich die JSON-Datei?
+## Where do I get the JSON file?
 
-Du kannst die Datei direkt aus Azure ziehen, z. B. über Azure CLI:
+You can export it directly from Azure, for example with Azure CLI:
 
 ```bash
 az network firewall policy rule-collection-group list \
@@ -24,7 +25,7 @@ az network firewall policy rule-collection-group list \
   --output json > rules.json
 ```
 
-Wenn du nur **eine** Rule Collection Group exportieren willst:
+If you only want to export **one** Rule Collection Group:
 
 ```bash
 az network firewall policy rule-collection-group show \
@@ -34,7 +35,7 @@ az network firewall policy rule-collection-group show \
   --output json > rules.json
 ```
 
-Alternativ per PowerShell:
+Alternatively via PowerShell:
 
 ```powershell
 Get-AzFirewallPolicyRuleCollectionGroup \
@@ -44,17 +45,17 @@ Get-AzFirewallPolicyRuleCollectionGroup \
   Out-File -Encoding utf8 rules.json
 ```
 
-## Wie finde ich Resource Group und Policy Name?
+## How do I find Resource Group and Policy Name?
 
 ### Azure CLI
 
-Alle Resource Groups anzeigen:
+List all Resource Groups:
 
 ```bash
 az group list --query "[].name" -o tsv
 ```
 
-Alle Firewall Policies in einer Resource Group anzeigen:
+List all Firewall Policies in a Resource Group:
 
 ```bash
 az network firewall policy list \
@@ -62,7 +63,7 @@ az network firewall policy list \
   --query "[].name" -o tsv
 ```
 
-(Optional) Policies über alle RGs mit RG-Namen anzeigen:
+(Optional) List policies across all Resource Groups including RG name:
 
 ```bash
 az network firewall policy list \
@@ -71,41 +72,53 @@ az network firewall policy list \
 
 ### PowerShell
 
-Alle Resource Groups:
+All Resource Groups:
 
 ```powershell
 Get-AzResourceGroup | Select-Object -ExpandProperty ResourceGroupName
 ```
 
-Alle Firewall Policies in einer Resource Group:
+All Firewall Policies in one Resource Group:
 
 ```powershell
 Get-AzFirewallPolicy -ResourceGroupName <RESOURCE_GROUP> |
   Select-Object -ExpandProperty Name
 ```
 
-Policies inklusive RG:
+Policies including Resource Group:
 
 ```powershell
 Get-AzFirewallPolicy |
   Select-Object Name, ResourceGroupName
 ```
 
-> Hinweis: Das Tool akzeptiert sowohl ein Wrapper-Objekt mit `collectionGroups`/`ruleCollectionGroups` **als auch** eine JSON-Liste von Rule Collection Groups auf Top-Level.
+> Note: The tool accepts both a wrapper object with `collectionGroups`/`ruleCollectionGroups` **and** a top-level JSON list of Rule Collection Groups.
 
-## Verwendung
+## Usage
 
 ```bash
 python azfw_analyzer.py <input.json>
 ```
 
-Optional mit Ausgabedatei:
+Optional text output file:
 
 ```bash
 python azfw_analyzer.py <input.json> --output report.txt
 ```
 
-## Beispielausgabe
+Optional HTML output (rules sorted by priority):
+
+```bash
+python azfw_analyzer.py <input.json> --html-output rules.html
+```
+
+You can also combine both outputs:
+
+```bash
+python azfw_analyzer.py <input.json> --output report.txt --html-output rules.html
+```
+
+## Example output
 
 ```text
 Azure Firewall Rule Analysis
@@ -116,7 +129,7 @@ Duplicate signatures: 8
 Potentially shadowed rules: 5
 ```
 
-## Hinweise
+## Notes
 
-- Die Shadowing-Analyse ist heuristisch und sollte als Hinweis verstanden werden.
-- Für Production-Use können weitere Prüfungen ergänzt werden (z. B. DNAT/NAT-spezifische Semantik, Action-Order, Threat-Intel-Mode).
+- Shadowing analysis is heuristic and should be treated as guidance.
+- For production usage, you can extend checks (e.g., DNAT/NAT-specific semantics, action ordering, threat intel mode).

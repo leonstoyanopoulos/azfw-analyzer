@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -184,6 +185,39 @@ def render_report(rules: list[RuleRecord]) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def render_rules_html(rules: list[RuleRecord]) -> str:
+    sorted_rules = sorted(rules, key=lambda rule: (rule.collection_priority, rule.name.lower()))
+
+    rows: list[str] = []
+    for rule in sorted_rules:
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(rule.collection_priority))}</td>"
+            f"<td>{html.escape(rule.collection_group)}</td>"
+            f"<td>{html.escape(rule.collection)}</td>"
+            f"<td>{html.escape(rule.name)}</td>"
+            f"<td>{html.escape(rule.rule_type)}</td>"
+            f"<td>{html.escape(', '.join(rule.source_addresses))}</td>"
+            f"<td>{html.escape(', '.join(rule.destination_addresses))}</td>"
+            f"<td>{html.escape(', '.join(rule.destination_ports))}</td>"
+            f"<td>{html.escape(', '.join(rule.protocols))}</td>"
+            "</tr>"
+        )
+
+    body_rows = "\n".join(rows)
+    return (
+        "<html>\n"
+        "<body>\n"
+        "<h1>Azure Firewall Rules (sorted by priority)</h1>\n"
+        "<table border=\"1\">\n"
+        "<thead><tr><th>Priority</th><th>Collection Group</th><th>Collection</th><th>Rule Name</th><th>Type</th><th>Source Addresses</th><th>Destination Addresses</th><th>Destination Ports</th><th>Protocols</th></tr></thead>\n"
+        f"<tbody>\n{body_rows}\n</tbody>\n"
+        "</table>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Analyze Azure Firewall rule exports")
     parser.add_argument("input", type=Path, help="Path to Azure Firewall JSON export")
@@ -193,6 +227,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional output file for the generated report",
     )
+    parser.add_argument(
+        "--html-output",
+        type=Path,
+        help="Optional HTML output file with rules sorted by priority",
+    )
     return parser.parse_args()
 
 
@@ -200,11 +239,15 @@ def main() -> int:
     args = parse_args()
     rules = load_rules(args.input)
     report = render_report(rules)
+    html_report = render_rules_html(rules)
 
     if args.output:
         args.output.write_text(report, encoding="utf-8")
     else:
         print(report, end="")
+
+    if args.html_output:
+        args.html_output.write_text(html_report, encoding="utf-8")
     return 0
 
 
