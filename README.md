@@ -13,6 +13,39 @@ Eine kleine CLI-Applikation zur Analyse von **Azure Firewall Rules** (JSON-Expor
 
 - Python 3.10+
 
+## Woher bekomme ich die JSON-Datei?
+
+Du kannst die Datei direkt aus Azure ziehen, z. B. über Azure CLI:
+
+```bash
+az network firewall policy rule-collection-group list \
+  --resource-group <RESOURCE_GROUP> \
+  --policy-name <FIREWALL_POLICY_NAME> \
+  --output json > rules.json
+```
+
+Wenn du nur **eine** Rule Collection Group exportieren willst:
+
+```bash
+az network firewall policy rule-collection-group show \
+  --resource-group <RESOURCE_GROUP> \
+  --policy-name <FIREWALL_POLICY_NAME> \
+  --name <RULE_COLLECTION_GROUP_NAME> \
+  --output json > rules.json
+```
+
+Alternativ per PowerShell:
+
+```powershell
+Get-AzFirewallPolicyRuleCollectionGroup \
+  -ResourceGroupName <RESOURCE_GROUP> \
+  -AzureFirewallPolicyName <FIREWALL_POLICY_NAME> |
+  ConvertTo-Json -Depth 100 |
+  Out-File -Encoding utf8 rules.json
+```
+
+> Hinweis: Falls dein Export nicht direkt `collectionGroups` enthält, kannst du das JSON ggf. in ein Wrapper-Objekt mit `collectionGroups` oder `ruleCollectionGroups` packen.
+
 ## Verwendung
 
 ```bash
