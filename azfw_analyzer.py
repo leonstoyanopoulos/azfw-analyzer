@@ -18,6 +18,7 @@ class RuleRecord:
     collection_priority: int
     name: str
     rule_type: str
+    section: str
     source_addresses: tuple[str, ...]
     destination_addresses: tuple[str, ...]
     destination_ports: tuple[str, ...]
@@ -47,6 +48,28 @@ def _normalize_protocols(rule: dict[str, Any]) -> tuple[str, ...]:
     return ("ANY",)
 
 
+
+
+def _classify_rule_section(collection_rule_type: str, rule: dict[str, Any]) -> str:
+    collection_type_lower = collection_rule_type.lower()
+    rule_type_lower = str(rule.get("ruleType", "")).lower()
+
+    if "dnat" in collection_type_lower or "nat" in rule_type_lower:
+        return "DNAT"
+    if "application" in collection_type_lower or "application" in rule_type_lower:
+        return "Application"
+    if "network" in collection_type_lower or "network" in rule_type_lower:
+        return "Network"
+
+    if rule.get("translatedAddress") is not None or rule.get("translatedPort") is not None:
+        return "DNAT"
+    if any(
+        rule.get(key) is not None
+        for key in ("targetFqdns", "destinationFqdns", "targetUrls", "fqdnTags", "webCategories")
+    ):
+        return "Application"
+    return "Network"
+
 def load_rules(input_file: Path) -> list[RuleRecord]:
     data = json.loads(input_file.read_text(encoding="utf-8"))
     if isinstance(data, list):
@@ -69,8 +92,9 @@ def load_rules(input_file: Path) -> list[RuleRecord]:
                 if isinstance(collection.get("action"), dict)
                 else collection.get("action")
             )
-            rule_type = str(collection.get("ruleCollectionType", action or "Unknown"))
+            collection_rule_type = str(collection.get("ruleCollectionType", action or "Unknown"))
             for rule in collection.get("rules", []):
+                rule_type = str(rule.get("ruleType") or collection_rule_type)
                 records.append(
                     RuleRecord(
                         collection_group=group_name,
@@ -78,6 +102,7 @@ def load_rules(input_file: Path) -> list[RuleRecord]:
                         collection_priority=priority,
                         name=str(rule.get("name", "<unnamed-rule>")),
                         rule_type=rule_type,
+                        section=_classify_rule_section(collection_rule_type, rule),
                         source_addresses=_ensure_list(rule.get("sourceAddresses") or rule.get("sourceIpGroups")),
                         destination_addresses=_ensure_list(
                             rule.get("destinationAddresses")
@@ -215,9 +240,9 @@ def _render_rules_html_section(title: str, rules: list[RuleRecord]) -> str:
 
 
 def render_rules_html(rules: list[RuleRecord]) -> str:
-    dnat_rules = [rule for rule in rules if "dnat" in rule.rule_type.lower()]
-    network_rules = [rule for rule in rules if "network" in rule.rule_type.lower()]
-    application_rules = [rule for rule in rules if "application" in rule.rule_type.lower()]
+    dnat_rules = [rule for rule in rules if rule.section == "DNAT"]
+    network_rules = [rule for rule in rules if rule.section == "Network"]
+    application_rules = [rule for rule in rules if rule.section == "Application"]
 
     return (
         "<html>\n"

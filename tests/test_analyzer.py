@@ -169,3 +169,66 @@ def test_render_rules_html_creates_dnat_network_and_application_sections(tmp_pat
     assert "<h2>Network</h2>" in html
     assert "<h2>Application</h2>" in html
     assert html.index("network-early") < html.index("network-late")
+
+
+def test_render_rules_html_handles_generic_collection_types(tmp_path):
+    fixture = {
+        "collectionGroups": [
+            {
+                "name": "cg-generic",
+                "ruleCollections": [
+                    {
+                        "name": "generic-filter",
+                        "priority": 100,
+                        "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                        "action": {"type": "Allow"},
+                        "rules": [
+                            {
+                                "name": "generic-network",
+                                "ruleType": "NetworkRule",
+                                "sourceAddresses": ["10.0.0.0/24"],
+                                "destinationAddresses": ["20.0.0.10"],
+                                "destinationPorts": ["443"],
+                                "ipProtocols": ["TCP"],
+                            },
+                            {
+                                "name": "generic-application",
+                                "ruleType": "ApplicationRule",
+                                "sourceAddresses": ["10.0.0.0/24"],
+                                "destinationFqdns": ["example.org"],
+                                "protocols": [{"protocolType": "Https"}],
+                            },
+                        ],
+                    },
+                    {
+                        "name": "generic-nat",
+                        "priority": 110,
+                        "ruleCollectionType": "FirewallPolicyNatRuleCollection",
+                        "action": {"type": "Dnat"},
+                        "rules": [
+                            {
+                                "name": "generic-dnat",
+                                "ruleType": "NatRule",
+                                "sourceAddresses": ["*"],
+                                "destinationAddresses": ["40.0.0.10"],
+                                "destinationPorts": ["443"],
+                                "translatedAddress": "10.0.1.10",
+                                "translatedPort": "443",
+                                "ipProtocols": ["TCP"],
+                            }
+                        ],
+                    },
+                ],
+            }
+        ]
+    }
+
+    input_file = tmp_path / "rules-generic.json"
+    input_file.write_text(__import__("json").dumps(fixture), encoding="utf-8")
+
+    rules = load_rules(input_file)
+    html = render_rules_html(rules)
+
+    assert "generic-dnat" in html
+    assert "generic-network" in html
+    assert "generic-application" in html
