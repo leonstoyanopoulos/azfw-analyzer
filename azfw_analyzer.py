@@ -48,7 +48,13 @@ def _normalize_protocols(rule: dict[str, Any]) -> tuple[str, ...]:
 
 def load_rules(input_file: Path) -> list[RuleRecord]:
     data = json.loads(input_file.read_text(encoding="utf-8"))
-    groups = data.get("collectionGroups") or data.get("ruleCollectionGroups") or []
+    if isinstance(data, list):
+        groups = data
+    elif isinstance(data, dict):
+        groups = data.get("collectionGroups") or data.get("ruleCollectionGroups") or []
+    else:
+        raise ValueError("Unsupported JSON format: expected object or list of collection groups")
+
     records: list[RuleRecord] = []
 
     for group in groups:

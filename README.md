@@ -91,7 +91,7 @@ Get-AzFirewallPolicy |
   Select-Object Name, ResourceGroupName
 ```
 
-> Hinweis: Falls dein Export nicht direkt `collectionGroups` enthält, kannst du das JSON ggf. in ein Wrapper-Objekt mit `collectionGroups` oder `ruleCollectionGroups` packen.
+> Hinweis: Das Tool akzeptiert sowohl ein Wrapper-Objekt mit `collectionGroups`/`ruleCollectionGroups` **als auch** eine JSON-Liste von Rule Collection Groups auf Top-Level.
 
 ## Verwendung
 

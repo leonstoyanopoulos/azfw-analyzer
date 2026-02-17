@@ -57,3 +57,36 @@ def test_render_report_detects_duplicates_and_shadowing(tmp_path):
     assert "Duplicate names: 1" in report
     assert "Duplicate signatures: 1" in report
     assert "Potentially shadowed rules" in report
+
+
+def test_load_rules_supports_top_level_list(tmp_path):
+    fixture = [
+        {
+            "name": "cg-1",
+            "ruleCollections": [
+                {
+                    "name": "allow-web",
+                    "priority": 100,
+                    "ruleCollectionType": "NetworkRuleCollection",
+                    "rules": [
+                        {
+                            "name": "rule-a",
+                            "sourceAddresses": ["10.0.0.0/24"],
+                            "destinationAddresses": ["20.0.0.10"],
+                            "destinationPorts": ["443"],
+                            "ipProtocols": ["TCP"],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+    input_file = tmp_path / "rules-list.json"
+    input_file.write_text(__import__("json").dumps(fixture), encoding="utf-8")
+
+    rules = load_rules(input_file)
+
+    assert len(rules) == 1
+    assert rules[0].collection_group == "cg-1"
+    assert rules[0].name == "rule-a"
