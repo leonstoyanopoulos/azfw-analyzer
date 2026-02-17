@@ -39,7 +39,11 @@ def _normalize_protocols(rule: dict[str, Any]) -> tuple[str, ...]:
         out: list[str] = []
         for proto in protocols:
             if isinstance(proto, dict) and "protocolType" in proto:
-                out.append(str(proto["protocolType"]).upper())
+                protocol_type = str(proto["protocolType"]).upper()
+                if "port" in proto and proto["port"] is not None:
+                    out.append(f"{protocol_type}:{proto['port']}")
+                else:
+                    out.append(protocol_type)
             else:
                 out.append(str(proto).upper())
         return tuple(out) or ("ANY",)
@@ -80,6 +84,7 @@ def load_rules(input_file: Path) -> list[RuleRecord]:
                         source_addresses=_ensure_list(rule.get("sourceAddresses") or rule.get("sourceIpGroups")),
                         destination_addresses=_ensure_list(
                             rule.get("destinationAddresses")
+                            or rule.get("destinationIpGroups")
                             or rule.get("targetFqdns")
                             or rule.get("destinationFqdns")
                         ),

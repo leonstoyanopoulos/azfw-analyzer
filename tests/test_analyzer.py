@@ -90,3 +90,78 @@ def test_load_rules_supports_top_level_list(tmp_path):
     assert len(rules) == 1
     assert rules[0].collection_group == "cg-1"
     assert rules[0].name == "rule-a"
+
+
+
+def test_load_rules_includes_destination_ip_groups(tmp_path):
+    fixture = {
+        "collectionGroups": [
+            {
+                "name": "cg-1",
+                "ruleCollections": [
+                    {
+                        "name": "allow-ip-group",
+                        "priority": 100,
+                        "ruleCollectionType": "NetworkRuleCollection",
+                        "rules": [
+                            {
+                                "name": "rule-ipg",
+                                "sourceAddresses": ["10.0.0.0/24"],
+                                "destinationIpGroups": ["/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/ipGroups/ipg-a"],
+                                "destinationPorts": ["443"],
+                                "ipProtocols": ["TCP"],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    input_file = tmp_path / "rules-ipg.json"
+    input_file.write_text(__import__("json").dumps(fixture), encoding="utf-8")
+
+    rules = load_rules(input_file)
+
+    assert rules[0].destination_addresses == (
+        "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/ipGroups/ipg-a",
+    )
+
+
+def test_load_rules_preserves_application_protocol_ports(tmp_path):
+    fixture = {
+        "collectionGroups": [
+            {
+                "name": "cg-1",
+                "ruleCollections": [
+                    {
+                        "name": "app-rules",
+                        "priority": 100,
+                        "ruleCollectionType": "ApplicationRuleCollection",
+                        "rules": [
+                            {
+                                "name": "app-80",
+                                "sourceAddresses": ["10.0.0.0/24"],
+                                "targetFqdns": ["example.com"],
+                                "protocols": [{"protocolType": "Http", "port": 80}],
+                            },
+                            {
+                                "name": "app-8080",
+                                "sourceAddresses": ["10.0.0.0/24"],
+                                "targetFqdns": ["example.com"],
+                                "protocols": [{"protocolType": "Http", "port": 8080}],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    input_file = tmp_path / "rules-app.json"
+    input_file.write_text(__import__("json").dumps(fixture), encoding="utf-8")
+
+    rules = load_rules(input_file)
+
+    assert rules[0].protocols == ("HTTP:80",)
+    assert rules[1].protocols == ("HTTP:8080",)
