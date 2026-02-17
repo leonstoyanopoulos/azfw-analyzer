@@ -8,7 +8,7 @@ A small CLI application for analyzing **Azure Firewall Rules** from a JSON expor
 - Detects duplicate rule names
 - Detects duplicate rule definitions (same signature)
 - Reports potentially shadowed rules (an earlier, broader rule may shadow a later one)
-- Can export an HTML table with rules sorted by priority (no CSS)
+- Can export plain HTML (no CSS) with three sections: DNAT, Network, and Application (each sorted by priority)
 
 ## Requirements
 
@@ -106,7 +106,7 @@ Optional text output file:
 python azfw_analyzer.py <input.json> --output report.txt
 ```
 
-Optional HTML output (rules sorted by priority):
+Optional HTML output (three sections: DNAT, Network, Application; each sorted by priority):
 
 ```bash
 python azfw_analyzer.py <input.json> --html-output rules.html

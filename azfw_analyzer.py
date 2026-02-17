@@ -185,7 +185,7 @@ def render_report(rules: list[RuleRecord]) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-def render_rules_html(rules: list[RuleRecord]) -> str:
+def _render_rules_html_section(title: str, rules: list[RuleRecord]) -> str:
     sorted_rules = sorted(rules, key=lambda rule: (rule.collection_priority, rule.name.lower()))
 
     rows: list[str] = []
@@ -204,15 +204,28 @@ def render_rules_html(rules: list[RuleRecord]) -> str:
             "</tr>"
         )
 
-    body_rows = "\n".join(rows)
+    body_rows = "\n".join(rows) if rows else '<tr><td colspan="9">No rules found</td></tr>'
     return (
-        "<html>\n"
-        "<body>\n"
-        "<h1>Azure Firewall Rules (sorted by priority)</h1>\n"
+        f"<h2>{html.escape(title)}</h2>\n"
         "<table border=\"1\">\n"
         "<thead><tr><th>Priority</th><th>Collection Group</th><th>Collection</th><th>Rule Name</th><th>Type</th><th>Source Addresses</th><th>Destination Addresses</th><th>Destination Ports</th><th>Protocols</th></tr></thead>\n"
         f"<tbody>\n{body_rows}\n</tbody>\n"
         "</table>\n"
+    )
+
+
+def render_rules_html(rules: list[RuleRecord]) -> str:
+    dnat_rules = [rule for rule in rules if "dnat" in rule.rule_type.lower()]
+    network_rules = [rule for rule in rules if "network" in rule.rule_type.lower()]
+    application_rules = [rule for rule in rules if "application" in rule.rule_type.lower()]
+
+    return (
+        "<html>\n"
+        "<body>\n"
+        "<h1>Azure Firewall Rules (sorted by priority)</h1>\n"
+        f"{_render_rules_html_section('DNAT', dnat_rules)}"
+        f"{_render_rules_html_section('Network', network_rules)}"
+        f"{_render_rules_html_section('Application', application_rules)}"
         "</body>\n"
         "</html>\n"
     )

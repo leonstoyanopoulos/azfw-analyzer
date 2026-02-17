@@ -92,19 +92,19 @@ def test_load_rules_supports_top_level_list(tmp_path):
     assert rules[0].name == "rule-a"
 
 
-def test_render_rules_html_sorts_by_priority(tmp_path):
+def test_render_rules_html_creates_dnat_network_and_application_sections(tmp_path):
     fixture = {
         "collectionGroups": [
             {
                 "name": "cg-1",
                 "ruleCollections": [
                     {
-                        "name": "low-priority",
+                        "name": "network-low-priority",
                         "priority": 200,
                         "ruleCollectionType": "NetworkRuleCollection",
                         "rules": [
                             {
-                                "name": "rule-late",
+                                "name": "network-late",
                                 "sourceAddresses": ["10.1.0.0/24"],
                                 "destinationAddresses": ["10.0.0.1"],
                                 "destinationPorts": ["443"],
@@ -113,16 +113,44 @@ def test_render_rules_html_sorts_by_priority(tmp_path):
                         ],
                     },
                     {
-                        "name": "high-priority",
+                        "name": "network-high-priority",
                         "priority": 100,
                         "ruleCollectionType": "NetworkRuleCollection",
                         "rules": [
                             {
-                                "name": "rule-early",
+                                "name": "network-early",
                                 "sourceAddresses": ["*"],
                                 "destinationAddresses": ["10.0.0.1"],
                                 "destinationPorts": ["443"],
                                 "ipProtocols": ["TCP"],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "dnat-collection",
+                        "priority": 110,
+                        "ruleCollectionType": "DnatRuleCollection",
+                        "rules": [
+                            {
+                                "name": "dnat-rule",
+                                "sourceAddresses": ["*"],
+                                "destinationAddresses": ["40.0.0.10"],
+                                "destinationPorts": ["443"],
+                                "ipProtocols": ["TCP"],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "application-collection",
+                        "priority": 120,
+                        "ruleCollectionType": "ApplicationRuleCollection",
+                        "rules": [
+                            {
+                                "name": "app-rule",
+                                "sourceAddresses": ["10.2.0.0/24"],
+                                "destinationFqdns": ["example.org"],
+                                "destinationPorts": ["443"],
+                                "protocols": [{"protocolType": "Https"}],
                             }
                         ],
                     },
@@ -137,5 +165,7 @@ def test_render_rules_html_sorts_by_priority(tmp_path):
     rules = load_rules(input_file)
     html = render_rules_html(rules)
 
-    assert "<table" in html
-    assert html.index("rule-early") < html.index("rule-late")
+    assert "<h2>DNAT</h2>" in html
+    assert "<h2>Network</h2>" in html
+    assert "<h2>Application</h2>" in html
+    assert html.index("network-early") < html.index("network-late")
