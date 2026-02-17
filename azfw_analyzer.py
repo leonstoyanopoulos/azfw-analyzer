@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ class RuleRecord:
     collection_priority: int
     name: str
     rule_type: str
+    section: str
     source_addresses: tuple[str, ...]
     destination_addresses: tuple[str, ...]
     destination_ports: tuple[str, ...]
@@ -46,6 +48,28 @@ def _normalize_protocols(rule: dict[str, Any]) -> tuple[str, ...]:
     return ("ANY",)
 
 
+
+
+def _classify_rule_section(collection_rule_type: str, rule: dict[str, Any]) -> str:
+    collection_type_lower = collection_rule_type.lower()
+    rule_type_lower = str(rule.get("ruleType", "")).lower()
+
+    if "dnat" in collection_type_lower or "nat" in rule_type_lower:
+        return "DNAT"
+    if "application" in collection_type_lower or "application" in rule_type_lower:
+        return "Application"
+    if "network" in collection_type_lower or "network" in rule_type_lower:
+        return "Network"
+
+    if rule.get("translatedAddress") is not None or rule.get("translatedPort") is not None:
+        return "DNAT"
+    if any(
+        rule.get(key) is not None
+        for key in ("targetFqdns", "destinationFqdns", "targetUrls", "fqdnTags", "webCategories")
+    ):
+        return "Application"
+    return "Network"
+
 def load_rules(input_file: Path) -> list[RuleRecord]:
     data = json.loads(input_file.read_text(encoding="utf-8"))
     if isinstance(data, list):
@@ -68,8 +92,9 @@ def load_rules(input_file: Path) -> list[RuleRecord]:
                 if isinstance(collection.get("action"), dict)
                 else collection.get("action")
             )
-            rule_type = str(collection.get("ruleCollectionType", action or "Unknown"))
+            collection_rule_type = str(collection.get("ruleCollectionType", action or "Unknown"))
             for rule in collection.get("rules", []):
+                rule_type = str(rule.get("ruleType") or collection_rule_type)
                 records.append(
                     RuleRecord(
                         collection_group=group_name,
@@ -77,6 +102,7 @@ def load_rules(input_file: Path) -> list[RuleRecord]:
                         collection_priority=priority,
                         name=str(rule.get("name", "<unnamed-rule>")),
                         rule_type=rule_type,
+                        section=_classify_rule_section(collection_rule_type, rule),
                         source_addresses=_ensure_list(rule.get("sourceAddresses") or rule.get("sourceIpGroups")),
                         destination_addresses=_ensure_list(
                             rule.get("destinationAddresses")
@@ -184,6 +210,52 @@ def render_report(rules: list[RuleRecord]) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def _render_rules_html_section(title: str, rules: list[RuleRecord]) -> str:
+    sorted_rules = sorted(rules, key=lambda rule: (rule.collection_priority, rule.name.lower()))
+
+    rows: list[str] = []
+    for rule in sorted_rules:
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(rule.collection_priority))}</td>"
+            f"<td>{html.escape(rule.collection_group)}</td>"
+            f"<td>{html.escape(rule.collection)}</td>"
+            f"<td>{html.escape(rule.name)}</td>"
+            f"<td>{html.escape(rule.rule_type)}</td>"
+            f"<td>{html.escape(', '.join(rule.source_addresses))}</td>"
+            f"<td>{html.escape(', '.join(rule.destination_addresses))}</td>"
+            f"<td>{html.escape(', '.join(rule.destination_ports))}</td>"
+            f"<td>{html.escape(', '.join(rule.protocols))}</td>"
+            "</tr>"
+        )
+
+    body_rows = "\n".join(rows) if rows else '<tr><td colspan="9">No rules found</td></tr>'
+    return (
+        f"<h2>{html.escape(title)}</h2>\n"
+        "<table border=\"1\">\n"
+        "<thead><tr><th>Priority</th><th>Collection Group</th><th>Collection</th><th>Rule Name</th><th>Type</th><th>Source Addresses</th><th>Destination Addresses</th><th>Destination Ports</th><th>Protocols</th></tr></thead>\n"
+        f"<tbody>\n{body_rows}\n</tbody>\n"
+        "</table>\n"
+    )
+
+
+def render_rules_html(rules: list[RuleRecord]) -> str:
+    dnat_rules = [rule for rule in rules if rule.section == "DNAT"]
+    network_rules = [rule for rule in rules if rule.section == "Network"]
+    application_rules = [rule for rule in rules if rule.section == "Application"]
+
+    return (
+        "<html>\n"
+        "<body>\n"
+        "<h1>Azure Firewall Rules (sorted by priority)</h1>\n"
+        f"{_render_rules_html_section('DNAT', dnat_rules)}"
+        f"{_render_rules_html_section('Network', network_rules)}"
+        f"{_render_rules_html_section('Application', application_rules)}"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Analyze Azure Firewall rule exports")
     parser.add_argument("input", type=Path, help="Path to Azure Firewall JSON export")
@@ -193,6 +265,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional output file for the generated report",
     )
+    parser.add_argument(
+        "--html-output",
+        type=Path,
+        help="Optional HTML output file with rules sorted by priority",
+    )
     return parser.parse_args()
 
 
@@ -200,11 +277,15 @@ def main() -> int:
     args = parse_args()
     rules = load_rules(args.input)
     report = render_report(rules)
+    html_report = render_rules_html(rules)
 
     if args.output:
         args.output.write_text(report, encoding="utf-8")
     else:
         print(report, end="")
+
+    if args.html_output:
+        args.html_output.write_text(html_report, encoding="utf-8")
     return 0
 
 
