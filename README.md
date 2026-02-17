@@ -44,6 +44,53 @@ Get-AzFirewallPolicyRuleCollectionGroup \
   Out-File -Encoding utf8 rules.json
 ```
 
+## Wie finde ich Resource Group und Policy Name?
+
+### Azure CLI
+
+Alle Resource Groups anzeigen:
+
+```bash
+az group list --query "[].name" -o tsv
+```
+
+Alle Firewall Policies in einer Resource Group anzeigen:
+
+```bash
+az network firewall policy list \
+  --resource-group <RESOURCE_GROUP> \
+  --query "[].name" -o tsv
+```
+
+(Optional) Policies über alle RGs mit RG-Namen anzeigen:
+
+```bash
+az network firewall policy list \
+  --query "[].{policy:name,resourceGroup:resourceGroup}" -o table
+```
+
+### PowerShell
+
+Alle Resource Groups:
+
+```powershell
+Get-AzResourceGroup | Select-Object -ExpandProperty ResourceGroupName
+```
+
+Alle Firewall Policies in einer Resource Group:
+
+```powershell
+Get-AzFirewallPolicy -ResourceGroupName <RESOURCE_GROUP> |
+  Select-Object -ExpandProperty Name
+```
+
+Policies inklusive RG:
+
+```powershell
+Get-AzFirewallPolicy |
+  Select-Object Name, ResourceGroupName
+```
+
 > Hinweis: Falls dein Export nicht direkt `collectionGroups` enthält, kannst du das JSON ggf. in ein Wrapper-Objekt mit `collectionGroups` oder `ruleCollectionGroups` packen.
 
 ## Verwendung
