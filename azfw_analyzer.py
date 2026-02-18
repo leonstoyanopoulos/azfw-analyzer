@@ -211,6 +211,7 @@ def render_report(rules: list[RuleRecord]) -> str:
 
 
 def _render_rules_html_section(title: str, rules: list[RuleRecord]) -> str:
+    section_id = title.lower().replace(" ", "-")
     sorted_rules = sorted(rules, key=lambda rule: (rule.collection_priority, rule.name.lower()))
 
     rows: list[str] = []
@@ -232,7 +233,9 @@ def _render_rules_html_section(title: str, rules: list[RuleRecord]) -> str:
     body_rows = "\n".join(rows) if rows else '<tr><td colspan="9">No rules found</td></tr>'
     return (
         f"<h2>{html.escape(title)}</h2>\n"
-        "<table border=\"1\">\n"
+        f"<label for=\"filter-{section_id}\">Filter {html.escape(title)} rules (fuzzy):</label>\n"
+        f"<input id=\"filter-{section_id}\" data-fuzzy-filter=\"{html.escape(section_id)}\" type=\"search\" placeholder=\"Type to fuzzy filter...\">\n"
+        f"<table border=\"1\" data-fuzzy-table=\"{html.escape(section_id)}\">\n"
         "<thead><tr><th>Priority</th><th>Collection Group</th><th>Collection</th><th>Rule Name</th><th>Type</th><th>Source Addresses</th><th>Destination Addresses</th><th>Destination Ports</th><th>Protocols</th></tr></thead>\n"
         f"<tbody>\n{body_rows}\n</tbody>\n"
         "</table>\n"
@@ -251,6 +254,34 @@ def render_rules_html(rules: list[RuleRecord]) -> str:
         f"{_render_rules_html_section('DNAT', dnat_rules)}"
         f"{_render_rules_html_section('Network', network_rules)}"
         f"{_render_rules_html_section('Application', application_rules)}"
+        "<script>\n"
+        "const fuzzyMatch = (query, text) => {\n"
+        "  if (!query) return true;\n"
+        "  let queryIndex = 0;\n"
+        "  for (const char of text) {\n"
+        "    if (char === query[queryIndex]) queryIndex += 1;\n"
+        "    if (queryIndex === query.length) return true;\n"
+        "  }\n"
+        "  return false;\n"
+        "};\n"
+        "\n"
+        "document.querySelectorAll('[data-fuzzy-filter]').forEach((input) => {\n"
+        "  const section = input.dataset.fuzzyFilter;\n"
+        "  const table = document.querySelector(`[data-fuzzy-table='${section}']`);\n"
+        "  if (!table) return;\n"
+        "  const rows = Array.from(table.querySelectorAll('tbody tr'));\n"
+        "\n"
+        "  const applyFilter = () => {\n"
+        "    const query = input.value.trim().toLowerCase();\n"
+        "    rows.forEach((row) => {\n"
+        "      const text = row.textContent.toLowerCase();\n"
+        "      row.style.display = fuzzyMatch(query, text) ? '' : 'none';\n"
+        "    });\n"
+        "  };\n"
+        "\n"
+        "  input.addEventListener('input', applyFilter);\n"
+        "});\n"
+        "</script>\n"
         "</body>\n"
         "</html>\n"
     )

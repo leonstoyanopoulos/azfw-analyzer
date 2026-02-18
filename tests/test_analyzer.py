@@ -232,3 +232,39 @@ def test_render_rules_html_handles_generic_collection_types(tmp_path):
     assert "generic-dnat" in html
     assert "generic-network" in html
     assert "generic-application" in html
+
+
+def test_render_rules_html_includes_fuzzy_filters(tmp_path):
+    fixture = {
+        "collectionGroups": [
+            {
+                "name": "cg-1",
+                "ruleCollections": [
+                    {
+                        "name": "network",
+                        "priority": 100,
+                        "ruleCollectionType": "NetworkRuleCollection",
+                        "rules": [
+                            {
+                                "name": "allow-web",
+                                "sourceAddresses": ["10.0.0.0/24"],
+                                "destinationAddresses": ["20.0.0.10"],
+                                "destinationPorts": ["443"],
+                                "ipProtocols": ["TCP"],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    input_file = tmp_path / "rules-filter.json"
+    input_file.write_text(__import__("json").dumps(fixture), encoding="utf-8")
+
+    rules = load_rules(input_file)
+    html = render_rules_html(rules)
+
+    assert 'data-fuzzy-filter="network"' in html
+    assert 'data-fuzzy-table="network"' in html
+    assert 'const fuzzyMatch = (query, text) => {' in html
